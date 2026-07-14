@@ -1,28 +1,35 @@
-# PulseHealth Systems — AKS + Helm Platform
+# AKS + Helm Platform — PulseHealth Systems
 
-> **Project 4 of the Magela84 Cloud Engineering Portfolio**
-> Industry: Healthcare Technology · Client: PulseHealth Systems
+> **Project 4 · Magela84 Cloud Engineering Portfolio**
+> Industry: Healthcare Technology
 
-Consolidate four patient-facing applications — running today on
-individual, hand-patched VMs — onto a single **managed Azure Kubernetes
-Service (AKS)** platform with tenant isolation, standardized Helm-based
+## Client Overview
+
+PulseHealth Systems runs four patient-facing applications on individual
+VMs, where scaling and patching are painful and inconsistent. This
+engagement consolidates them onto a single **managed Azure Kubernetes
+Service (AKS)** platform with tenant isolation, standardized Helm
 releases, and automatic scaling for peak clinic hours.
 
 Everything here is **Infrastructure as Code — zero manual portal clicks.**
 
----
+## Problem Statement
 
-## The client problem → what this solves
+Four apps on four hand-patched VMs meant inconsistent updates, no tenant
+isolation, ad-hoc releases, and painful scaling when clinics get busy.
+PulseHealth needed one managed platform with namespace-level isolation, a
+repeatable packaging/release method, and autoscaling — with no passwords
+stored anywhere.
 
-| PulseHealth pain point | Solution in this repo |
-|---|---|
-| 4 apps on separate VMs, inconsistent patching | One AKS cluster, one image build path |
-| No tenant isolation | Namespace per app + NetworkPolicy + namespace-scoped RBAC |
-| Ad-hoc, manual releases | One reusable Helm chart, per-app values files |
-| Painful scaling during clinic peaks | HPA per app + cluster autoscaler on the user node pool |
-| Passwords/keys sprawled across VMs | Managed Identity for ACR pulls, OIDC for CI — no stored secrets |
+## What I Built
 
----
+- **AKS cluster** via Terraform — separate **system** and **user** node pools
+- **One reusable Helm chart**, deployed 4× via per-app values files
+- **NGINX Ingress + TLS** (cert-manager / Let's Encrypt), one shared LB
+- **Namespace-scoped RBAC** + ServiceAccount per team + default-deny NetworkPolicy
+- **ACR via Managed Identity** (`AcrPull`) — passwordless image pulls
+- **HorizontalPodAutoscaler** per workload + cluster autoscaler on the user pool
+- **GitHub Actions** pipeline (OIDC, no stored secret) for Helm deploys
 
 ## Architecture
 
@@ -50,28 +57,27 @@ Everything here is **Infrastructure as Code — zero manual portal clicks.**
    Observability: OMS agent → Log Analytics (Container Insights)
 ```
 
-See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the full design and
-[`docs/RUNBOOK.md`](docs/RUNBOOK.md) for step-by-step deploy commands.
+Full design in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md); step-by-step
+commands in [`docs/RUNBOOK.md`](docs/RUNBOOK.md).
 
----
+## Resources Deployed
 
-## Repository layout
+| Resource | Type | Purpose |
+|---|---|---|
+| `rg-pulsehealth-dev` | Resource Group | Container for all resources |
+| `aks-pulsehealth-dev` | AKS Cluster | Managed Kubernetes (system + user pools) |
+| `acrpulsehealthdev001` | Azure Container Registry | Private image store for 4 apps |
+| kubelet Managed Identity | Managed Identity (`AcrPull`) | Passwordless image pulls |
+| `law-pulsehealth-dev` | Log Analytics Workspace | Container Insights logs + metrics |
+| 4 namespaces + RBAC | Namespace / Role / RoleBinding / SA | Tenant isolation per app |
+| 4 Helm releases | Deployment / Service / Ingress / HPA | One per patient app |
 
-```
-terraform/          AKS (system + user pools), ACR, Managed Identity, RBAC, Log Analytics
-helm/pulsehealth-app/   ONE reusable chart: Deployment, Service, Ingress+TLS, HPA, ServiceAccount
-helm/values/            per-app overrides (patient-portal, appointments, telehealth, billing)
-k8s/namespaces.yaml     4 tenant namespaces (pod-security: restricted)
-k8s/rbac/               per-team Role + RoleBinding + default-deny NetworkPolicy
-k8s/ingress-nginx/      NGINX Ingress + cert-manager install notes
-apps/                   4 placeholder Flask services + Dockerfiles (swap for real apps)
-.github/workflows/      build → push to ACR (OIDC) → helm upgrade
-scripts/                01 infra → 02 connect → 03 ingress → 04 deploy apps
-```
+## Technologies Used
 
----
+Terraform · AKS · Helm · kubectl · Azure Container Registry · Managed
+Identity · NGINX Ingress · cert-manager · GitHub Actions (OIDC) · Docker
 
-## Quick start (Azure Cloud Shell)
+## How to Deploy
 
 ```bash
 git clone https://github.com/Magela84/pulsehealth-aks-helm-platform.git
@@ -90,19 +96,20 @@ cp terraform/terraform.tfvars.example terraform/terraform.tfvars
 ./scripts/04-deploy-apps.sh acrpulsehealthdev001.azurecr.io
 ```
 
----
+> **Cost note (dev sizing):** AKS control plane **Free** tier + 1 system
+> node + 1–4 user nodes (`Standard_D2s_v3`) + Basic ACR. Run
+> `az aks stop` between demos to minimise spend.
 
-## Tech stack
+## Engagement Outcome
 
-Terraform · AKS · Helm · kubectl · Azure Container Registry · Managed
-Identity · NGINX Ingress · cert-manager · GitHub Actions (OIDC) · Docker
+Four VM-hosted apps consolidated onto one AKS platform: each isolated in
+its own namespace with scoped RBAC and default-deny networking, packaged
+by a single reusable Helm chart, autoscaling at both pod and node level
+for clinic peaks, and released through an OIDC-authenticated pipeline with
+**no secrets stored anywhere**. Terraform passes `validate`; the platform
+is reproducible from code.
 
-## Cost note (dev sizing)
+## Author
 
-AKS control plane **Free** tier + 1 system node + 1–4 user nodes
-(`Standard_D2s_v3`) + Basic ACR. Scale the node pool to zero-idle by
-stopping the cluster (`az aks stop`) when not demoing to minimise spend.
-
----
-
-*Built by [Magela84](https://github.com/Magela84) · Cloud Engineer @ Tek Tariq IT Solutions*
+**Magela84** — Cloud Engineer
+[github.com/Magela84](https://github.com/Magela84)
